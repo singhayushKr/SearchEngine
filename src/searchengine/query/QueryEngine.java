@@ -15,6 +15,7 @@ public class QueryEngine {
     private final InvertedIndex invertedIndex;
     private final Indexer indexer;
     private final Ranker ranker;
+    private final QueryParser parser;
 
     public QueryEngine(
             InvertedIndex invertedIndex,
@@ -22,59 +23,60 @@ public class QueryEngine {
     ) {
         this.invertedIndex = invertedIndex;
         this.indexer = indexer;
+
         this.ranker = new Ranker(
                 invertedIndex,
                 indexer
         );
+
+        this.parser = new QueryParser();
     }
 
     public List<SearchResult> search(String query) {
 
-        String normalizedQuery =
-                query.toLowerCase().trim();
+        QueryParser.Query parsedQuery =
+                parser.parse(query);
 
-        if (normalizedQuery.isEmpty()) {
-            return List.of();
-        }
+        return switch (parsedQuery.getType()) {
 
-        // Phrase search
-        if (normalizedQuery.startsWith("\"")
-                && normalizedQuery.endsWith("\"")) {
+            case EMPTY -> List.of();
 
-            String phrase =
-                    normalizedQuery.substring(
-                            1,
-                            normalizedQuery.length() - 1
-                    ).trim();
+            case AND ->
+                    searchAnd(
+                            parsedQuery.getTerms()
+                    );
 
-            return searchPhrase(phrase);
-        }
+            case OR ->
+                    searchOr(
+                            parsedQuery.getTerms()
+                    );
 
-        // OR query
-        if (normalizedQuery.contains(" or ")) {
-            return searchOr(normalizedQuery);
-        }
-
-        // AND / normal query
-        return searchAnd(normalizedQuery);
+            case PHRASE ->
+                    searchPhrase(
+                            parsedQuery.getTerms()
+                    );
+        };
     }
 
-    private List<SearchResult> searchAnd(String query) {
-
-        String[] words =
-                query.split("\\s+and\\s+|\\s+");
+    private List<SearchResult> searchAnd(
+            String[] words
+    ) {
 
         Set<Integer> resultIds = null;
 
         for (String word : words) {
 
             Map<Integer, Integer> matches =
-                    invertedIndex.search(word);
+                    invertedIndex.search(
+                            word
+                    );
 
             if (resultIds == null) {
 
                 resultIds =
-                        new HashSet<>(matches.keySet());
+                        new HashSet<>(
+                                matches.keySet()
+                        );
 
             } else {
 
@@ -84,7 +86,9 @@ public class QueryEngine {
             }
         }
 
-        if (resultIds == null) {
+        if (resultIds == null
+                || resultIds.isEmpty()) {
+
             return List.of();
         }
 
@@ -94,10 +98,9 @@ public class QueryEngine {
         );
     }
 
-    private List<SearchResult> searchOr(String query) {
-
-        String[] words =
-                query.split("\\s+or\\s+");
+    private List<SearchResult> searchOr(
+            String[] words
+    ) {
 
         Set<Integer> resultIds =
                 new HashSet<>();
@@ -114,6 +117,10 @@ public class QueryEngine {
             );
         }
 
+        if (resultIds.isEmpty()) {
+            return List.of();
+        }
+
         return ranker.rank(
                 resultIds,
                 words
@@ -121,29 +128,27 @@ public class QueryEngine {
     }
 
     private List<SearchResult> searchPhrase(
-            String phrase
+            String[] words
     ) {
 
-        String[] words =
-                phrase.split("\\s+");
-
-        if (words.length == 0) {
-            return List.of();
-        }
-
-        // First find documents containing
-        // every word in the phrase.
         Set<Integer> candidateIds = null;
 
+        // First use the inverted index
+        // to find documents containing
+        // every word.
         for (String word : words) {
 
             Map<Integer, Integer> matches =
-                    invertedIndex.search(word);
+                    invertedIndex.search(
+                            word
+                    );
 
             if (candidateIds == null) {
 
                 candidateIds =
-                        new HashSet<>(matches.keySet());
+                        new HashSet<>(
+                                matches.keySet()
+                        );
 
             } else {
 
@@ -159,12 +164,12 @@ public class QueryEngine {
             return List.of();
         }
 
-        // Now verify the actual phrase.
+        // Build the actual phrase.
+        String phrase =
+                String.join(" ", words);
+
         Set<Integer> phraseMatches =
                 new HashSet<>();
-
-        String normalizedPhrase =
-                phrase.toLowerCase();
 
         for (int documentId : candidateIds) {
 
@@ -178,11 +183,17 @@ public class QueryEngine {
             }
 
             content = content
-                    .replaceAll("<[^>]*>", " ")
+                    .replaceAll(
+                            "<[^>]*>",
+                            " "
+                    )
                     .toLowerCase();
 
-            if (content.contains(normalizedPhrase)) {
-                phraseMatches.add(documentId);
+            if (content.contains(phrase)) {
+
+                phraseMatches.add(
+                        documentId
+                );
             }
         }
 
