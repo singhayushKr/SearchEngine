@@ -12,11 +12,14 @@ public class Indexer {
 
     private final InvertedIndex invertedIndex;
     private final Map<Integer, String> documentPaths;
+    private final Map<Integer, String> documentContents;
+
     private int documentId = 1;
 
     public Indexer(InvertedIndex invertedIndex) {
         this.invertedIndex = invertedIndex;
         this.documentPaths = new HashMap<>();
+        this.documentContents = new HashMap<>();
     }
 
     public void index(String pagePath) throws IOException {
@@ -31,7 +34,17 @@ public class Indexer {
                 content
         );
 
-        documentPaths.put(documentId, pagePath);
+        documentPaths.put(
+                documentId,
+                pagePath
+        );
+
+        documentContents.put(
+                documentId,
+                content
+        );
+
+        invertedIndex.addDocument();
 
         documentId++;
 
@@ -43,22 +56,34 @@ public class Indexer {
         String content = document.getContent();
 
         // Remove HTML tags
-        content = content.replaceAll("<[^>]*>", " ");
+        content = content.replaceAll(
+                "<[^>]*>",
+                " "
+        );
 
         // Normalize case
         content = content.toLowerCase();
 
         // Split into words
-        String[] words = content.split("\\W+");
+        String[] words =
+                content.split("\\W+");
 
         for (String word : words) {
+
             if (!word.isEmpty()) {
-                invertedIndex.add(word, document.getId());
+                invertedIndex.add(
+                        word,
+                        document.getId()
+                );
             }
         }
     }
 
     public String getDocumentPath(int documentId) {
         return documentPaths.get(documentId);
+    }
+
+    public String getDocumentContent(int documentId) {
+        return documentContents.get(documentId);
     }
 }

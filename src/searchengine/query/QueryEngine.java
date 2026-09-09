@@ -2,8 +2,9 @@ package searchengine.query;
 
 import searchengine.index.Indexer;
 import searchengine.index.InvertedIndex;
+import searchengine.model.SearchResult;
+import searchengine.ranking.Ranker;
 
-import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -13,30 +14,55 @@ public class QueryEngine {
 
     private final InvertedIndex invertedIndex;
     private final Indexer indexer;
+    private final Ranker ranker;
 
-    public QueryEngine(InvertedIndex invertedIndex, Indexer indexer) {
+    public QueryEngine(
+            InvertedIndex invertedIndex,
+            Indexer indexer
+    ) {
         this.invertedIndex = invertedIndex;
         this.indexer = indexer;
+        this.ranker = new Ranker(
+                invertedIndex,
+                indexer
+        );
     }
 
-    public List<String> search(String query) {
+    public List<SearchResult> search(String query) {
 
-        String normalizedQuery = query.toLowerCase().trim();
+        String normalizedQuery =
+                query.toLowerCase().trim();
 
         if (normalizedQuery.isEmpty()) {
             return List.of();
         }
 
+        // Phrase search
+        if (normalizedQuery.startsWith("\"")
+                && normalizedQuery.endsWith("\"")) {
+
+            String phrase =
+                    normalizedQuery.substring(
+                            1,
+                            normalizedQuery.length() - 1
+                    ).trim();
+
+            return searchPhrase(phrase);
+        }
+
+        // OR query
         if (normalizedQuery.contains(" or ")) {
             return searchOr(normalizedQuery);
         }
 
+        // AND / normal query
         return searchAnd(normalizedQuery);
     }
 
-    private List<String> searchAnd(String query) {
+    private List<SearchResult> searchAnd(String query) {
 
-        String[] words = query.split("\\s+and\\s+|\\s+");
+        String[] words =
+                query.split("\\s+and\\s+|\\s+");
 
         Set<Integer> resultIds = null;
 
@@ -46,9 +72,15 @@ public class QueryEngine {
                     invertedIndex.search(word);
 
             if (resultIds == null) {
-                resultIds = new HashSet<>(matches.keySet());
+
+                resultIds =
+                        new HashSet<>(matches.keySet());
+
             } else {
-                resultIds.retainAll(matches.keySet());
+
+                resultIds.retainAll(
+                        matches.keySet()
+                );
             }
         }
 
@@ -56,39 +88,107 @@ public class QueryEngine {
             return List.of();
         }
 
-        return convertToPaths(resultIds);
+        return ranker.rank(
+                resultIds,
+                words
+        );
     }
 
-    private List<String> searchOr(String query) {
+    private List<SearchResult> searchOr(String query) {
 
-        String[] words = query.split("\\s+or\\s+");
+        String[] words =
+                query.split("\\s+or\\s+");
 
-        Set<Integer> resultIds = new HashSet<>();
+        Set<Integer> resultIds =
+                new HashSet<>();
 
         for (String word : words) {
 
             Map<Integer, Integer> matches =
-                    invertedIndex.search(word.trim());
+                    invertedIndex.search(
+                            word.trim()
+                    );
 
-            resultIds.addAll(matches.keySet());
+            resultIds.addAll(
+                    matches.keySet()
+            );
         }
 
-        return convertToPaths(resultIds);
+        return ranker.rank(
+                resultIds,
+                words
+        );
     }
 
-    private List<String> convertToPaths(Set<Integer> documentIds) {
+    private List<SearchResult> searchPhrase(
+            String phrase
+    ) {
 
-        List<String> results = new ArrayList<>();
+        String[] words =
+                phrase.split("\\s+");
 
-        for (int documentId : documentIds) {
+        if (words.length == 0) {
+            return List.of();
+        }
 
-            String path = indexer.getDocumentPath(documentId);
+        // First find documents containing
+        // every word in the phrase.
+        Set<Integer> candidateIds = null;
 
-            if (path != null) {
-                results.add(path);
+        for (String word : words) {
+
+            Map<Integer, Integer> matches =
+                    invertedIndex.search(word);
+
+            if (candidateIds == null) {
+
+                candidateIds =
+                        new HashSet<>(matches.keySet());
+
+            } else {
+
+                candidateIds.retainAll(
+                        matches.keySet()
+                );
             }
         }
 
-        return results;
+        if (candidateIds == null
+                || candidateIds.isEmpty()) {
+
+            return List.of();
+        }
+
+        // Now verify the actual phrase.
+        Set<Integer> phraseMatches =
+                new HashSet<>();
+
+        String normalizedPhrase =
+                phrase.toLowerCase();
+
+        for (int documentId : candidateIds) {
+
+            String content =
+                    indexer.getDocumentContent(
+                            documentId
+                    );
+
+            if (content == null) {
+                continue;
+            }
+
+            content = content
+                    .replaceAll("<[^>]*>", " ")
+                    .toLowerCase();
+
+            if (content.contains(normalizedPhrase)) {
+                phraseMatches.add(documentId);
+            }
+        }
+
+        return ranker.rank(
+                phraseMatches,
+                words
+        );
     }
 }

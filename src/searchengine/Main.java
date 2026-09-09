@@ -3,8 +3,10 @@ package searchengine;
 import searchengine.crawler.Crawler;
 import searchengine.index.Indexer;
 import searchengine.index.InvertedIndex;
+import searchengine.model.SearchResult;
 import searchengine.query.QueryEngine;
 
+import java.util.List;
 import java.util.Set;
 
 public class Main {
@@ -14,16 +16,19 @@ public class Main {
         // 1. Crawl pages
         Crawler crawler = new Crawler();
 
-        Set<String> pages = crawler.crawl("java.html");
+        Set<String> pages =
+                crawler.crawl("java.html");
 
         System.out.println("Crawled pages:");
         System.out.println(pages);
 
         // 2. Create inverted index
-        InvertedIndex invertedIndex = new InvertedIndex();
+        InvertedIndex invertedIndex =
+                new InvertedIndex();
 
         // 3. Create indexer
-        Indexer indexer = new Indexer(invertedIndex);
+        Indexer indexer =
+                new Indexer(invertedIndex);
 
         // 4. Index every crawled page
         for (String page : pages) {
@@ -32,36 +37,66 @@ public class Main {
 
         // 5. Create query engine
         QueryEngine queryEngine =
-                new QueryEngine(invertedIndex, indexer);
+                new QueryEngine(
+                        invertedIndex,
+                        indexer
+                );
 
         // 6. Search
         System.out.println("\nSearch results:");
 
-        System.out.println("java: " +
-                queryEngine.search("java"));
+        printResults(
+                "java",
+                queryEngine.search("java")
+        );
 
-        System.out.println("programming: " +
-                queryEngine.search("programming"));
+        printResults(
+                "programming",
+                queryEngine.search("programming")
+        );
 
-        System.out.println("database: " +
-                queryEngine.search("database"));
+        printResults(
+                "database",
+                queryEngine.search("database")
+        );
 
-        System.out.println("network: " +
-                queryEngine.search("network"));
+        printResults(
+                "java programming",
+                queryEngine.search("java programming")
+        );
 
-        System.out.println("java programming: " +
-                queryEngine.search("java programming"));
+        printResults(
+                "java OR database",
+                queryEngine.search("java OR database")
+        );
 
-        System.out.println("java network: " +
-                queryEngine.search("java network"));
+        printResults(
+                "\"java programming\"",
+                queryEngine.search("\"java programming\"")
+        );
 
-        System.out.println("unknown: " +
-                queryEngine.search("xyzabc"));
+        printResults(
+                "\"networking and java\"",
+                queryEngine.search("\"networking and java\"")
+        );
+    }
 
-        System.out.println("java AND programming: " +
-                queryEngine.search("java AND programming"));
+    private static void printResults(
+            String query,
+            List<SearchResult> results
+    ) {
 
-        System.out.println("java OR database: " +
-                queryEngine.search("java OR database"));
+        System.out.println(
+                "\nQuery: " + query
+        );
+
+        for (SearchResult result : results) {
+
+            System.out.println(
+                    result.getPath()
+                            + " -> score = "
+                            + result.getScore()
+            );
+        }
     }
 }
