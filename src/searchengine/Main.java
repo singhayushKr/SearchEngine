@@ -3,6 +3,7 @@ package searchengine;
 import searchengine.crawler.Crawler;
 import searchengine.index.Indexer;
 import searchengine.index.InvertedIndex;
+import searchengine.query.QueryEngine;
 
 import java.util.Set;
 
@@ -12,33 +13,40 @@ public class Main {
 
         // 1. Crawl pages
         Crawler crawler = new Crawler();
+
         Set<String> pages = crawler.crawl("java.html");
 
         System.out.println("Crawled pages:");
         System.out.println(pages);
 
-        // 2. Create index
+        // 2. Create inverted index
         InvertedIndex invertedIndex = new InvertedIndex();
+
+        // 3. Create indexer
         Indexer indexer = new Indexer(invertedIndex);
 
-        // 3. Index every crawled page
+        // 4. Index every crawled page
         for (String page : pages) {
             indexer.index(page);
         }
 
-        // 4. Test searches
+        // 5. Create query engine
+        QueryEngine queryEngine =
+                new QueryEngine(invertedIndex, indexer);
+
+        // 6. Search
         System.out.println("\nSearch results:");
 
         System.out.println("java: " +
-                invertedIndex.search("java"));
+                queryEngine.search("java"));
 
         System.out.println("programming: " +
-                invertedIndex.search("programming"));
+                queryEngine.search("programming"));
 
         System.out.println("database: " +
-                invertedIndex.search("database"));
+                queryEngine.search("database"));
 
         System.out.println("network: " +
-                invertedIndex.search("network"));
+                queryEngine.search("network"));
     }
 }
