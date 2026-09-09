@@ -48,5 +48,20 @@ public class Main {
 
         System.out.println("network: " +
                 queryEngine.search("network"));
+
+        System.out.println("java programming: " +
+                queryEngine.search("java programming"));
+
+        System.out.println("java network: " +
+                queryEngine.search("java network"));
+
+        System.out.println("unknown: " +
+                queryEngine.search("xyzabc"));
+
+        System.out.println("java AND programming: " +
+                queryEngine.search("java AND programming"));
+
+        System.out.println("java OR database: " +
+                queryEngine.search("java OR database"));
     }
 }

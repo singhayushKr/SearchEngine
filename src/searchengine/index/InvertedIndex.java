@@ -1,13 +1,11 @@
 package searchengine.index;
 
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
-import java.util.Set;
 
 public class InvertedIndex {
 
-    private final Map<String, Set<Integer>> index;
+    private final Map<String, Map<Integer, Integer>> index;
 
     public InvertedIndex() {
         index = new HashMap<>();
@@ -15,17 +13,13 @@ public class InvertedIndex {
 
     public void add(String word, int documentId) {
 
-        Set<Integer> documents = index.get(word);
+        Map<Integer, Integer> documents =
+                index.computeIfAbsent(word, key -> new HashMap<>());
 
-        if (documents == null) {
-            documents = new HashSet<>();
-            index.put(word, documents);
-        }
-
-        documents.add(documentId);
+        documents.merge(documentId, 1, Integer::sum);
     }
 
-    public Set<Integer> search(String word) {
-        return index.getOrDefault(word, Set.of());
+    public Map<Integer, Integer> search(String word) {
+        return index.getOrDefault(word, Map.of());
     }
 }

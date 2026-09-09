@@ -40,8 +40,15 @@ public class Indexer {
 
     public void index(Document document) {
 
-        String content = document.getContent().toLowerCase();
+        String content = document.getContent();
 
+        // Remove HTML tags
+        content = content.replaceAll("<[^>]*>", " ");
+
+        // Normalize case
+        content = content.toLowerCase();
+
+        // Split into words
         String[] words = content.split("\\W+");
 
         for (String word : words) {
